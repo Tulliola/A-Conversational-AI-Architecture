@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kokoro-deployment
+  labels:
+    app: kokoro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kokoro
+  template:
+    metadata:
+      labels:
+        app: kokoro
+    spec:
+      containers:
+      - name: kokoro
+        image: kokoro-for-nvidia5060:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8880
+        env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              name: kokoro-configmap
+              key: NVIDIA_VISIBLE_DEVICES
+        - name: CUDA_VISIBLE_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              name: kokoro-configmap
+              key: CUDA_VISIBLE_DEVICES
+        - name: USE_GPU
+          valueFrom:
+            configMapKeyRef:
+              name: kokoro-configmap
+              key: USE_GPU
+        - name: DEVICE
+          valueFrom:
+            configMapKeyRef:
+              name: kokoro-configmap
+              key: DEVICE
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kokoro-service
+spec:
+  selector:
+    app: kokoro
+  ports:
+    - protocol: TCP
+      port: 8880
+      targetPort: 8880
+      

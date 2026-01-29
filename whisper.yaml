@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-deployment
+  labels:
+    app: whisper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper
+  template:
+    metadata:
+      labels:
+        app: whisper
+    spec:
+      containers:
+      - name: whisper
+        image: fedirz/faster-whisper-server:latest-cuda
+        ports:
+        - containerPort: 8000
+        # resources:
+        #   limits:
+        #     nvidia.com/gpu: 1
+        volumeMounts:
+          - name: whisper-model-storage
+            mountPath: /root/.cache/huggingface
+        env:
+        - name: PUID
+          valueFrom:
+            configMapKeyRef:
+              name: whisper-configmap
+              key: PUID
+        - name: PGID
+          valueFrom:
+            configMapKeyRef:
+              name: whisper-configmap
+              key: PGID
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: whisper-configmap
+              key: TZ
+        - name: WHISPER_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: whisper-configmap
+              key: WHISPER_MODEL
+        - name: WHISPER_COMPUTE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: whisper-configmap
+              key: WHISPER_COMPUTE_TYPE
+      volumes:
+      - name: whisper-model-storage
+        persistentVolumeClaim:
+          claimName: whisper-pvc
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisper-service
+spec:
+  selector:
+    app: whisper
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

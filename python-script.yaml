@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: python-script-job
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: py-script
+        image: my_test_py:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: LLM_URL
+          valueFrom:
+            configMapKeyRef:
+              name: python-script-configmap
+              key: LLM_URL
+        - name: ASR_URL
+          valueFrom:
+            configMapKeyRef:
+              name: python-script-configmap
+              key: ASR_URL
+        - name: TTS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: python-script-configmap
+              key: TTS_URL
+        volumeMounts:
+        - name: shared-storage
+          mountPath: /shared_data
+      volumes:
+      - name: shared-storage
+        hostPath:
+          path: /data_exchange
+          type: Directory

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kokoro-configmap
+data:
+  NVIDIA_VISIBLE_DEVICES: "all"
+  CUDA_VISIBLE_DEVICES: "0"
+  USE_GPU: "true"
+  DEVICE: "gpu"
