@@ -28,11 +28,13 @@ end_time = time.time()
 print("[ASR] Ending transcription...")
 print(f"[ASR] Time elapsed: {end_time - start_time} seconds\n")
 
+print(f"\n\n{transcription}")
+
 print("[LLM] Starting completion...")
 start_time = time.time()
 
 response_from_llm = llm_client.chat.completions.create(
-    model="llama3.2:3b",
+    model="Qwen/Qwen3-4B-Instruct-2507",
     messages=[
         {'role': 'system',
             'content': 'You are a funny agent. Explain everything you have been asked in terms of Red Dead Redemption 2.'},

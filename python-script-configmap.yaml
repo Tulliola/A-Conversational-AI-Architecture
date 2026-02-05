@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: python-script-configmap
 data:
-  LLM_URL: "http://ollama-service:11434/v1"
+  LLM_URL: "http://qwen3-next-service:80/v1"
   ASR_URL: "http://whisper-service:8000/v1"
   TTS_URL: "http://kokoro-service:8880/v1"
   SHARED_DIR: "/shared_data"

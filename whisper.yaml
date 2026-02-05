@@ -19,12 +19,6 @@ spec:
         image: fedirz/faster-whisper-server:latest-cuda
         ports:
         - containerPort: 8000
-        # resources:
-        #   limits:
-        #     nvidia.com/gpu: 1
-        volumeMounts:
-          - name: whisper-model-storage
-            mountPath: /root/.cache/huggingface
         env:
         - name: PUID
           valueFrom:
@@ -51,11 +45,13 @@ spec:
             configMapKeyRef:
               name: whisper-configmap
               key: WHISPER_COMPUTE_TYPE
+        volumeMounts:
+        - name: whisper-model-storage
+          mountPath: /root/.cache/huggingface
       volumes:
       - name: whisper-model-storage
         persistentVolumeClaim:
-          claimName: whisper-pvc
-        
+          claimName: hdd-pvc
 ---
 apiVersion: v1
 kind: Service

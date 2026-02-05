@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-gemma-deployment
+  labels:
+    app: embedding-gemma
+spec:
+  selector:
+    matchLabels:
+      app: embedding-gemma
+  template:
+    metadata:
+      labels:
+        app: embedding-gemma
+    spec:
+      containers:
+      - name: embedding-gemma
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: IfNotPresent # Default value
+        ports:
+        - containerPort: 8000
+        command: ["/bin/sh", "-c"]
+        args: 
+        - |
+          vllm serve \
+          --model /root/.cache/huggingface/ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf \
+        volumeMounts:
+        - name: embedding-gemma-model-storage
+          mountPath: /root/.cache/huggingface
+      volumes:
+      - name: embedding-gemma-model-storage
+        persistentVolumeClaim:
+          claimName: hdd-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-gemma-service
+spec:
+  selector:
+    app: embedding-gemma
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
