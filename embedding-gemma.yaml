@@ -15,18 +15,26 @@ spec:
     spec:
       containers:
       - name: embedding-gemma
-        image: vllm/vllm-openai:latest
+        image: ghcr.io/ggml-org/llama.cpp:server-cuda
         imagePullPolicy: IfNotPresent # Default value
+        resources:
+          limits:
+            nvidia.com/gpu: 1
         ports:
         - containerPort: 8000
-        command: ["/bin/sh", "-c"]
-        args: 
-        - |
-          vllm serve \
-          --model /root/.cache/huggingface/ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf \
+        args:
+        - "-m"
+        - "/models/ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf"
+        - "--embedding"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        - "--n-gpu-layers"
+        - "99"
         volumeMounts:
         - name: embedding-gemma-model-storage
-          mountPath: /root/.cache/huggingface
+          mountPath: /models
       volumes:
       - name: embedding-gemma-model-storage
         persistentVolumeClaim:
