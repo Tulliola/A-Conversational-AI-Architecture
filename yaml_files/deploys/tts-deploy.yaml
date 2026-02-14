@@ -1,54 +1,57 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kokoro-deployment
+  name: tts-deployment
   labels:
-    app: kokoro
+    app: tts
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kokoro
+      app: tts
   template:
     metadata:
       labels:
-        app: kokoro
+        app: tts
     spec:
       containers:
-      - name: kokoro
+      - name: tts
         image: kokoro-for-nvidia5060:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8880
+        resources:
+          limits:
+            nvidia.com/gpu: 1
         env:
         - name: NVIDIA_VISIBLE_DEVICES
           valueFrom:
             configMapKeyRef:
-              name: kokoro-configmap
+              name: tts-configmap
               key: NVIDIA_VISIBLE_DEVICES
         - name: CUDA_VISIBLE_DEVICES
           valueFrom:
             configMapKeyRef:
-              name: kokoro-configmap
+              name: tts-configmap
               key: CUDA_VISIBLE_DEVICES
         - name: USE_GPU
           valueFrom:
             configMapKeyRef:
-              name: kokoro-configmap
+              name: tts-configmap
               key: USE_GPU
         - name: DEVICE
           valueFrom:
             configMapKeyRef:
-              name: kokoro-configmap
+              name: tts-configmap
               key: DEVICE
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: kokoro-service
+  name: tts-service
 spec:
   selector:
-    app: kokoro
+    app: tts
   ports:
     - protocol: TCP
       port: 8880

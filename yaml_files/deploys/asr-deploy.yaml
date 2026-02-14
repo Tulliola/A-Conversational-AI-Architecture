@@ -1,65 +1,68 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: whisper-deployment
+  name: asr-deployment
   labels:
-    app: whisper
+    app: asr
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: whisper
+      app: asr
   template:
     metadata:
       labels:
-        app: whisper
+        app: asr
     spec:
       containers:
-      - name: whisper
+      - name: asr
         image: fedirz/faster-whisper-server:latest-cuda
         ports:
         - containerPort: 8000
+        resources:
+          limits:
+            nvidia.com/gpu: 1
         env:
         - name: PUID
           valueFrom:
             configMapKeyRef:
-              name: whisper-configmap
+              name: asr-configmap
               key: PUID
         - name: PGID
           valueFrom:
             configMapKeyRef:
-              name: whisper-configmap
+              name: asr-configmap
               key: PGID
         - name: TZ
           valueFrom:
             configMapKeyRef:
-              name: whisper-configmap
+              name: asr-configmap
               key: TZ
-        - name: WHISPER_MODEL
+        - name: ASR_MODEL
           valueFrom:
             configMapKeyRef:
-              name: whisper-configmap
-              key: WHISPER_MODEL
-        - name: WHISPER_COMPUTE_TYPE
+              name: asr-configmap
+              key: ASR_MODEL
+        - name: ASR_COMPUTE_TYPE
           valueFrom:
             configMapKeyRef:
-              name: whisper-configmap
-              key: WHISPER_COMPUTE_TYPE
+              name: asr-configmap
+              key: ASR_COMPUTE_TYPE
         volumeMounts:
-        - name: whisper-model-storage
+        - name: asr-model-storage
           mountPath: /root/.cache/huggingface
       volumes:
-      - name: whisper-model-storage
+      - name: asr-model-storage
         persistentVolumeClaim:
           claimName: hdd-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: whisper-service
+  name: asr-service
 spec:
   selector:
-    app: whisper
+    app: asr
   ports:
     - protocol: TCP
       port: 8000

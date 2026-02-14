@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: qwen3-next-deployment
+  name: llm-deployment
   labels:
-    app: qwen3-next
+    app: llm
 spec:
   selector:
     matchLabels:
-      app: qwen3-next
+      app: llm
   template:
     metadata:
       labels:
-        app: qwen3-next
+        app: llm
     spec:
       volumes:
-      - name: qwen3-next-model-storage
+      - name: llm-model-storage
         persistentVolumeClaim:
           claimName: hdd-pvc
       - name: dshm
@@ -22,7 +22,7 @@ spec:
           medium: Memory
           sizeLimit: "4Gi"
       containers:
-      - name: qwen3-next
+      - name: llm
         image: vllm/vllm-openai:latest
         imagePullPolicy: IfNotPresent
         ports:
@@ -33,15 +33,15 @@ spec:
           vllm serve \
           --model /root/.cache/huggingface/lmstudio-community/Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
           --served-model-name Qwen/Qwen3-4B-Instruct-2507 \
-          --gpu-memory-utilization 0.75 \
+          --gpu-memory-utilization 0.6 \
           --dtype float16 \
-          --max-model-len 4096 \
+          --max-model-len 2048 \
           --enforce-eager
         resources:
           limits:
             nvidia.com/gpu: 1
         volumeMounts:
-        - name: qwen3-next-model-storage
+        - name: llm-model-storage
           mountPath: /root/.cache/huggingface
         - name: dshm
           mountPath: /dev/shm
@@ -49,10 +49,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: qwen3-next-service
+  name: llm-service
 spec:
   selector:
-    app: qwen3-next
+    app: llm
   ports:
   - protocol: TCP
     port: 80

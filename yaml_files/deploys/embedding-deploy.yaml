@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-deployment
+  labels:
+    app: embedding
+spec:
+  selector:
+    matchLabels:
+      app: embedding
+  template:
+    metadata:
+      labels:
+        app: embedding
+    spec:
+      containers:
+      - name: embedding
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: IfNotPresent # Default value
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: huggingface-secret
+              key: token
+        command: ["/bin/sh", "-c"]
+        args: 
+        - |
+          vllm serve google/embeddinggemma-300m \
+          --served-model-name text-embedding-embeddinggemma-300m \
+          --gpu-memory-utilization 0.13 \
+          --max-model-len 512 \
+          --dtype bfloat16 \
+          --enforce-eager
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: embedding-model-storage
+          mountPath: root/.cache/huggingface
+      volumes:
+      - name: embedding-model-storage
+        persistentVolumeClaim:
+          claimName: hdd-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-service
+spec:
+  selector:
+    app: embedding
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

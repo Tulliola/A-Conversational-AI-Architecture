@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "1. Avvia il cluster minikube",
+            "type": "shell",
+            "command": "minikube start --driver=docker --gpus all --memory 12288 --cpus 6",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        },
+        {
+            "label": "2. Monta il Data Lake dei modelli nel cluster",
+            "type": "shell",
+            "command": "minikube mount \"/mnt/d/AI-Models:/data/hdd_models\"",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            },
+            "dependsOn": [
+                "1. Avvia il cluster minikube"
+            ]
+        },
+        {
+            "label": "=== AVVIA Minikube ===",
+            "dependsOn": [
+                "1. Avvia il cluster minikube",
+                "2. Monta il Data Lake dei modelli nel cluster"
+            ],
+            "dependsOrder": "parallel",
+            "problemMatcher": []
+        },
+        {
+            "label": "[TEST] Apri tunnel di port-forwarding per testare l'embedding model",
+            "type": "shell",
+            "command": "kubectl port-forward svc/embedding-service 8000:80",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        }
+    ]
+}
