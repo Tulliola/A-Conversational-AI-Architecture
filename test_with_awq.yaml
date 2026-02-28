@@ -27,16 +27,15 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
+        env:
+        - name: HF_HOME
+          value: "/root/.cache/huggingface"
         command: ["/bin/sh", "-c"]
         args: 
         - | 
           vllm serve \
-          --model /root/.cache/huggingface/lmstudio-community/Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-          --served-model-name Qwen/Qwen3-4B-Instruct-2507 \
-          --gpu-memory-utilization 0.8 \
-          --dtype float16 \
-          --max-model-len 2048 \
-          --enforce-eager
+          --model Qwen/Qwen2.5-3B-Instruct-AWQ \
+          --gpu-memory-utilization 0.8 
         resources:
           limits:
             nvidia.com/gpu: 1

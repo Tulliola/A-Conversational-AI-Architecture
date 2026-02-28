@@ -35,9 +35,20 @@
             "problemMatcher": []
         },
         {
-            "label": "[TEST] Apri tunnel di port-forwarding per testare l'embedding model",
+            "label": "[TEST Embedding] Apri tunnel di port-forwarding per testare l'embedding model",
             "type": "shell",
             "command": "kubectl port-forward svc/embedding-service 8000:80",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        },
+        {
+            "label": "[TEST LLM] Apri tunnel di port-forwarding per testare l'LLM",
+            "type": "shell",
+            "command": "kubectl port-forward svc/llm-service 8001:80",
             "isBackground": true,
             "presentation": {
                 "reveal": "always",

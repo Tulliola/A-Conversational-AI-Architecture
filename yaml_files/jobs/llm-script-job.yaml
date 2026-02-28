@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llm-script
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: llm-script-job
+        image: llm_test:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+

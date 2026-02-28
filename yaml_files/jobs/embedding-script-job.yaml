@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: embedding-script
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: embedding-script-job
+        image: embedding_test:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+
