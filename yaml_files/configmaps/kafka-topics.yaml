@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topics-configmap
+data:
+  USER_QUERY: user_query
+  

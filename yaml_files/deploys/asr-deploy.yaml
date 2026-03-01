@@ -51,6 +51,21 @@ spec:
         volumeMounts:
         - name: asr-model-storage
           mountPath: /root/.cache/huggingface
+      - name: kafka-asr
+        image: kafka-sidecar:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-u", "kafka-asr.py"]
+        env:
+        - name: KAFKA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: KAFKA_URL
+        - name: TOPIC_TO_PRODUCE
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-topics-configmap
+              key: USER_QUERY
       volumes:
       - name: asr-model-storage
         persistentVolumeClaim:

@@ -45,6 +45,21 @@ spec:
           mountPath: /root/.cache/huggingface
         - name: dshm
           mountPath: /dev/shm
+      - name: kafka-llm
+        image: kafka-sidecar:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-u", "kafka-llm.py"]
+        env:
+        - name: KAFKA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: KAFKA_URL
+        - name: TOPIC_TO_CONSUME
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-topics-configmap
+              key: USER_QUERY
 ---
 apiVersion: v1
 kind: Service

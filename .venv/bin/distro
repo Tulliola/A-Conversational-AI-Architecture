@@ -1,4 +1,4 @@
-#!/home/tullio/test_k8s/.venv/bin/python3
+#!/home/tullio/conversational_ai_architecture/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
