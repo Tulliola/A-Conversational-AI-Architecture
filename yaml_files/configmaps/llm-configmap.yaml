@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-configmap
+data:
+  MODEL_PATH: "/root/.cache/huggingface/lmstudio-community/Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+  MODEL_NAME: "Qwen/Qwen3-4B-Instruct-2507"

@@ -4,4 +4,4 @@ metadata:
   name: kafka-topics-configmap
 data:
   USER_QUERY: user_query
-  
+  LLM_RESPONSE: llm_response

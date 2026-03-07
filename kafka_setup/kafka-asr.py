@@ -1,12 +1,11 @@
 from confluent_kafka import Producer, Consumer
-from openai import OpenAI
 import os
 import json
 import time
 import sys
 
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
-topic_to_produce = os.getenv('TOPIC_TO_PRODUCE', 'output_topic')
+topic_to_produce = os.getenv('TOPIC_TO_PRODUCE', 'user_query')
 
 print(f"PRODUCER AVVIATO | {kafka_url} | {topic_to_produce}")
 
@@ -26,13 +25,13 @@ def delivery_report(err, msg):
 def main():
 
     while True:
-        data = {
-            'domanda': 'Cosa si intende per Docker?'
+        message = {
+            "text": "What holiday occurres on 1st January 2026?"
         }
         print("Producendo il topic...", flush=True)
         producer.produce(
             topic=topic_to_produce,
-            value=json.dumps(data).encode('utf-8'),
+            value=json.dumps(message).encode('utf-8'),
             callback=delivery_report
         )
         print("Topic prodotto.", flush=True)
@@ -41,7 +40,7 @@ def main():
 
         producer.flush()
 
-        time.sleep(5)
+        time.sleep(60)
 
 
 if __name__ == '__main__':

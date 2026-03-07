@@ -7,3 +7,4 @@ data:
   CUDA_VISIBLE_DEVICES: "0"
   USE_GPU: "true"
   DEVICE: "gpu"
+  SHARED_DIR: "/audio_files"

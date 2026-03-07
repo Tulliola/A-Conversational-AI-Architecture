@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dialog-manager-deployment
+  labels:
+    app: dialog-manager
+spec:
+  selector:
+    matchLabels:
+      app: dialog-manager
+  template:
+    metadata:
+      labels:
+        app: dialog-manager
+    spec:
+      containers:
+      - name: dialog-manager
+        image: dialog-manager:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        env:
+        - name: KAFKA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: KAFKA_URL
+        - name: LLM_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: LLM_URL
+        - name: TOPIC_TO_CONSUME
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-topics-configmap
+              key: USER_QUERY
+        - name: TOPIC_TO_PRODUCE
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-topics-configmap
+              key: LLM_RESPONSE
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: llm-configmap
+              key: MODEL_NAME
+        command: ["python", "-u", "dialog-manager.py"]

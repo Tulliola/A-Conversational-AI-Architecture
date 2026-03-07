@@ -20,7 +20,10 @@
                 "reveal": "always",
                 "panel": "new",
                 "group": "minikube-testing"
-            }
+            },
+            "dependsOn": [
+                "1. Avvia il cluster minikube"
+            ]
         },
         {
             "label": "=== AVVIA Minikube ===",

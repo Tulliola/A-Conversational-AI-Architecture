@@ -48,7 +48,11 @@ spec:
           volumeMounts:
             - name: kafka-storage
               mountPath: /var/lib/kafka/data
-      volumes:
-        - name: kafka-storage
-          persistentVolumeClaim:
-            claimName: kafka-pvc
+      volumeClaimTemplates:
+      - metadata:
+          name: kafka-storage
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 10Gi

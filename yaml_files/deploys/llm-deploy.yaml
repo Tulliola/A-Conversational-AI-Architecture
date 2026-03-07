@@ -27,16 +27,29 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
+        env:
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: llm-configmap
+              key: MODEL_NAME
+        - name: MODEL_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: llm-configmap
+              key: MODEL_PATH
         command: ["/bin/sh", "-c"]
         args: 
         - | 
           vllm serve \
-          --model /root/.cache/huggingface/lmstudio-community/Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
-          --served-model-name Qwen/Qwen3-4B-Instruct-2507 \
+          --model $(MODEL_PATH) \
+          --served-model-name $(MODEL_NAME) \
           --gpu-memory-utilization 0.8 \
           --dtype float16 \
           --max-model-len 2048 \
-          --enforce-eager
+          --enforce-eager \
+          --enable-auto-tool-choice \
+          --tool-call-parser hermes
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -45,21 +58,6 @@ spec:
           mountPath: /root/.cache/huggingface
         - name: dshm
           mountPath: /dev/shm
-      - name: kafka-llm
-        image: kafka-sidecar:latest
-        imagePullPolicy: IfNotPresent
-        command: ["python", "-u", "kafka-llm.py"]
-        env:
-        - name: KAFKA_URL
-          valueFrom:
-            configMapKeyRef:
-              name: endpoints-configmap
-              key: KAFKA_URL
-        - name: TOPIC_TO_CONSUME
-          valueFrom:
-            configMapKeyRef:
-              name: kafka-topics-configmap
-              key: USER_QUERY
 ---
 apiVersion: v1
 kind: Service

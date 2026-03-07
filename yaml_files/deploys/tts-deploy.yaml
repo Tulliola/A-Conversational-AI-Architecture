@@ -44,6 +44,39 @@ spec:
             configMapKeyRef:
               name: tts-configmap
               key: DEVICE
+      - name: kafka-tts
+        image: kafka-sidecar:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-u", "kafka-tts.py"]
+        env:
+        - name: TTS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: TTS_URL
+        - name: KAFKA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: KAFKA_URL
+        - name: SHARED_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: tts-configmap
+              key: SHARED_DIR
+        - name: TOPIC_TO_CONSUME
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-topics-configmap
+              key: LLM_RESPONSE
+        volumeMounts:
+        - name: shared-storage
+          mountPath: /audio_files
+      volumes:
+      - name: shared-storage
+        hostPath:
+          path: /data_exchange
+          type: Directory
 ---
 apiVersion: v1
 kind: Service
