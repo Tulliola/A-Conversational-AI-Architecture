@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: "db-headless-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: knowledge-graph
+          image: neo4j:5
+          ports:
+            - containerPort: 7474
+              name: http
+            - containerPort: 7687
+              name: bolt
+          env:
+          - name: NEO4J_AUTH
+            valueFrom:
+              secretKeyRef:
+                name: db-secret
+                key: auth
+          - name: NEO4J_PLUGINS
+            value: '["apoc"]'
+          volumeMounts:
+            - name: db-storage
+              mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: db-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi

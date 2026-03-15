@@ -20,7 +20,8 @@ def set_up_kafka_consumer():
         consumer = Consumer({
             'bootstrap.servers': kafka_url,
             'group.id': 'dialog-manager-group',
-            'auto.offset.reset': 'latest'
+            'auto.offset.reset': 'latest',
+            'enable.auto.commit': False
         })
         consumer.subscribe([topic_to_consume])
         print(f"Subscribed to topic {topic_to_consume}", flush=True)
@@ -100,8 +101,8 @@ app = graph.compile()
 def main():
     while True:
         try:
-            message = consumer.poll(timeout=1.0)
-
+            message = consumer.poll()
+            
             if message and message.error():
                 print(f"Consumer error: {message}", flush=True)
             elif message:
@@ -121,6 +122,8 @@ def main():
                     topic=topic_to_produce,
                     value=llm_json_response
                 )
+
+                consumer.commit(message)
         except Exception as e:
             print(f"Error occured during consumer polling: {e}")
 
