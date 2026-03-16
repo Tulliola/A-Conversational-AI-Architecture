@@ -26,7 +26,8 @@ def main():
 
     while True:
         message = {
-            "text": "What holiday occurres on 1st January 2026?"
+            "text": "Che cosa si intende per Testing White Box e Black Box?",
+            "conv_id": 1
         }
         print("Producendo il topic...", flush=True)
         producer.produce(

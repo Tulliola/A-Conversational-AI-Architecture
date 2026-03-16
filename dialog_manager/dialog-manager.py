@@ -8,6 +8,7 @@ from langgraph.graph import StateGraph, START, END
 from confluent_kafka import Consumer, Producer, KafkaException
 import os
 import json
+import sys
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
@@ -29,6 +30,7 @@ def set_up_kafka_consumer():
         return consumer
     except KafkaException as k:
         print(f"Raised exception during subscription: {k}")
+        sys.exit(1)
 
 
 def set_up_kafka_producer():
@@ -108,6 +110,9 @@ def main():
             elif message:
                 message = json.loads(message.value().decode('utf-8'))
                 user_query = message['text']
+                conversation_id = message['conv_id']
+
+                print(f"Received message: {message}", flush=True)
 
                 final_state = app.invoke({"messages": [("user", user_query)]})
                 llm_response = final_state['messages'][-1].content
@@ -115,7 +120,8 @@ def main():
                 print(llm_response, flush=True)
 
                 llm_json_response = json.dumps({
-                    "text": llm_response
+                    "text": llm_response,
+                    "conv_id": conversation_id
                 }).encode('utf-8')
 
                 producer.produce(
@@ -125,6 +131,7 @@ def main():
 
                 consumer.commit(message)
         except Exception as e:
+            producer.flush()
             print(f"Error occured during consumer polling: {e}")
 
 

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect-deployment
+  labels:
+    app: kafka-connect
+spec: 
+  selector:
+    matchLabels:
+      app: kafka-connect
+  template:
+    metadata:
+      labels:
+        app: kafka-connect
+    spec:
+      containers:
+      - name: kafka-connect
+        imagePullPolicy: IfNotPresent
+        image: confluentinc/cp-kafka-connect:7.5.0
+        ports:
+        - containerPort: 8083
+          name: restapi
+        command:
+          - /bin/bash
+          - -c
+          - |
+            confluent-hub install --no-prompt neo4j/kafka-connect-neo4j:5.0.0
+            /etc/confluent/docker/run
+        env:
+        - name: CONNECT_PLUGIN_PATH
+          value: '/usr/share/java,/usr/share/confluent-hub-components'
+
+        - name: CONNECT_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: KAFKA_URL
+
+        - name: CONNECT_GROUP_ID
+          value: "kafka-connect-group"
+
+        - name: CONNECT_CONFIG_STORAGE_TOPIC
+          value: "connect-configs"
+        - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+          value: "1"
+        
+        - name: CONNECT_OFFSET_STORAGE_TOPIC
+          value: "connect-offsets"
+        - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+          value: "1"
+
+        - name: CONNECT_STATUS_STORAGE_TOPIC
+          value: "connect-status"
+        - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+          value: "1"
+
+        - name: CONNECT_KEY_CONVERTER
+          value: org.apache.kafka.connect.storage.StringConverter
+        - name: CONNECT_VALUE_CONVERTER
+          value: org.apache.kafka.connect.json.JsonConverter
+        - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_REST_PORT
+          value: "8083"
+        - name: CONNECT_REST_ADVERTISED_HOST_NAME
+          value: "kafka-connect-service"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect-service
+spec:
+  selector:
+    app: kafka-connect
+  ports:
+  - port: 8083
+    targetPort: 8083
