@@ -6,4 +6,6 @@ data:
   LLM_URL: "http://llm-service:80/v1"
   TTS_URL: "http://tts-service:8880/v1"
   KAFKA_URL: "kafka-0.kafka-service.kafka.svc.cluster.local:9092"
+  DB_URL: "neo4j://db-headless-service:7687"
+  EMBEDDING_URL: "http://embedding-service:80/v1"
   

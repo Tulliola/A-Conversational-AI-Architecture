@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: embedding-configmap
+data:
+  EMBEDDING_MODEL_NAME: "text-embedding-embeddinggemma-300m"

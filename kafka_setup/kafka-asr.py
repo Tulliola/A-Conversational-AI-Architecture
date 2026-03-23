@@ -26,7 +26,7 @@ def main():
 
     while True:
         message = {
-            "text": "Che cosa si intende per Testing White Box e Black Box?",
+            "text": "Come si diagnostica?",
             "conv_id": 1
         }
         print("Producendo il topic...", flush=True)

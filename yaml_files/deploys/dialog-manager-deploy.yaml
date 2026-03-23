@@ -30,6 +30,21 @@ spec:
             configMapKeyRef:
               name: endpoints-configmap
               key: LLM_URL
+        - name: EMBEDDING_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: EMBEDDING_URL
+        - name: EMBEDDING_MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-configmap
+              key: EMBEDDING_MODEL_NAME
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: endpoints-configmap
+              key: DB_URL
         - name: TOPIC_TO_CONSUME
           valueFrom:
             configMapKeyRef:
@@ -45,4 +60,14 @@ spec:
             configMapKeyRef:
               name: llm-configmap
               key: MODEL_NAME
+        - name: DB_AUTH_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: AUTH_USER
+        - name: DB_AUTH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: AUTH_PASSWORD
         command: ["python", "-u", "dialog-manager.py"]

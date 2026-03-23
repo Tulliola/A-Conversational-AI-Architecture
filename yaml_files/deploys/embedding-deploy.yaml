@@ -26,11 +26,16 @@ spec:
             secretKeyRef:
               name: huggingface-secret
               key: token
+        - name: EMBEDDING_MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-configmap
+              key: EMBEDDING_MODEL_NAME
         command: ["/bin/sh", "-c"]
         args: 
         - |
           vllm serve google/embeddinggemma-300m \
-          --served-model-name text-embedding-embeddinggemma-300m \
+          --served-model-name $(EMBEDDING_MODEL_NAME) \
           --gpu-memory-utilization 0.13 \
           --max-model-len 512 \
           --dtype bfloat16 \

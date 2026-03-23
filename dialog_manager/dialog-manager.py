@@ -6,9 +6,12 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import StateGraph, START, END
 from confluent_kafka import Consumer, Producer, KafkaException
+from neo4j import GraphDatabase
+from openai import OpenAI
 import os
 import json
 import sys
+import traceback
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
@@ -39,9 +42,70 @@ def set_up_kafka_producer():
     })
 
 
+# Neo4j variables
+db_uri = os.getenv('DB_URL', 'neo4j://db-headless-service:7687')
+db_auth = (os.getenv('DB_AUTH_USER', 'neo4j'),
+           os.getenv('DB_AUTH_PASSWORD', 'password'))
+
+
+def get_conversation_history(session_id):
+    cypher_query = """
+    MATCH (c:CONVERSATION {conv_id: $session_id})-[:STARTS_WITH|FOLLOWED_BY*0..]->(u:UTTERANCE)
+    RETURN 
+        CASE 
+            WHEN u:USER THEN 'user'
+            WHEN u:SYSTEM THEN 'ai' 
+            ELSE 'unknown' 
+        END AS role, 
+        u.text AS text
+    """
+
+    with GraphDatabase.driver(db_uri, auth=db_auth) as driver:
+        records, _, _ = driver.execute_query(
+            cypher_query,
+            session_id=session_id,
+            database_="neo4j"
+        )
+        return [(record["role"], record["text"]) for record in records]
+
+
 # LLM variables
 model_name = os.getenv('MODEL_NAME', "Qwen/Qwen3-4B-Instruct-2507")
-model_url = os.getenv('LLM_URL', "http://localhost:8000/v1")
+model_url = os.getenv('LLM_URL', "http://llm-service:80/v1")
+
+# Embedding variables
+embedding_name = os.getenv('EMBEDDING_MODEL_NAME',
+                           "text-embedding-embeddinggemma-300m")
+embedding_url = os.getenv('EMBEDDING_URL', "http://embedding-service:80/v1")
+
+embedding_model = OpenAI(
+    api_key="none",
+    base_url=embedding_url
+)
+
+
+def get_embedding(text):
+    return embedding_model.embeddings.create(
+        input=[text.replace('\n', ' ')],
+        model=embedding_name).data[0].embedding
+
+
+def get_full_context(conversation_id, user_query):
+    system_prompt = (
+        "system",
+        "Sei un assistente olografico personale specializzato. "
+        "Rispondi alle domande al meglio delle tue capacità. "
+        "Se l'utente fa domande specifiche sull'epilessia, DEVI assolutamente utilizzare il tool 'retrieval_augmented_generation' per cercare le informazioni prima di rispondere. "
+        "Se chiede informazioni sulle date, usa il tool 'holiday_calendar'.")
+    past_conversation_history = get_conversation_history(
+        conversation_id)
+    
+    if len(past_conversation_history) > 4:
+        past_conversation_history = past_conversation_history[-4:]
+
+    current_conversation_history = [("user", user_query)]
+    return [system_prompt] + \
+        past_conversation_history + current_conversation_history
 
 
 class AgentState(TypedDict):
@@ -49,16 +113,49 @@ class AgentState(TypedDict):
 
 
 @tool
-def holiday_calendar(date: str) -> str:
-    """This is a calendar function that returns the holiday based on the specified date"""
+def retrieval_augmented_generation(user_query: str) -> list[str]:
+    """
+    DEVE essere invocato per TUTTE le domande relative all'epilessia.
+    Cerca nel database vettoriale informazioni cliniche e mediche sull'epilessia.
+    
+    Args:
+        user_query: La domanda esatta o il concetto sull'epilessia cercato dall'utente.
+    """
 
-    return "Christmas"
+    user_query_embedding = get_embedding(user_query)
+
+    cypher_query = """
+        CALL db.index.vector.queryNodes("embeddingIndex", 3, $embedding)
+        YIELD node, score
+        WITH node AS emb, score AS affinity ORDER BY affinity DESC
+        MATCH (c:CHUNK)-[:HAS_QUESTION|HAS_STATEMENT]-(k:QUESTION|STATEMENT)-[:HAS_EMBEDDING]-(emb:EMBEDDING)
+        RETURN c.text AS text
+    """
+
+    with GraphDatabase.driver(db_uri, auth=db_auth) as driver:
+        records, _, _ = driver.execute_query(
+            cypher_query,
+            embedding=user_query_embedding,
+            database_="neo4j"
+        )
+        return [(record["text"]) for record in records]
+
+
+@tool
+def holiday_calendar(date: str) -> str:
+    """
+    DEVE essere invocato ogni qualvolta l'utente fa riferimento ad una data e vuole conoscere la festività che cade in quella data.
+    Restituisce la festività che cade in quella data specificata dall'utente.
+
+    Args:
+        date: la data a cui l'utente fa riferimento.
+    """
+
+    return "Natale"
 
 
 def model_call(state: AgentState) -> AgentState:
-    system_prompt = SystemMessage(
-        content="You are my AI assistant. Please answer my query to the best of your ability.")
-    response = model.invoke([system_prompt] + state['messages'])
+    response = model.invoke(state['messages'])
     return {'messages': [response]}
 
 
@@ -71,7 +168,7 @@ def should_continue(state: AgentState):
 consumer = set_up_kafka_consumer()
 producer = set_up_kafka_producer()
 
-tools = [holiday_calendar]
+tools = [holiday_calendar, retrieval_augmented_generation]
 stop_tokens = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"]
 
 model = ChatOpenAI(
@@ -103,18 +200,24 @@ app = graph.compile()
 def main():
     while True:
         try:
-            message = consumer.poll()
-            
+            message = consumer.poll(timeout=1.0)
+
             if message and message.error():
                 print(f"Consumer error: {message}", flush=True)
             elif message:
-                message = json.loads(message.value().decode('utf-8'))
-                user_query = message['text']
-                conversation_id = message['conv_id']
+                payload = json.loads(message.value().decode('utf-8'))
+                user_query = payload['text']
+                conversation_id = payload['conv_id']
 
-                print(f"Received message: {message}", flush=True)
+                if 'text' not in payload and 'conv_id' not in payload:
+                    print(f"[ERROR] Malformed message {payload}", flush=True)
+                    continue
 
-                final_state = app.invoke({"messages": [("user", user_query)]})
+                print(f"Received message: {payload}", flush=True)
+
+                full_context = get_full_context(conversation_id, user_query)
+
+                final_state = app.invoke({"messages": full_context})
                 llm_response = final_state['messages'][-1].content
 
                 print(llm_response, flush=True)
@@ -133,6 +236,7 @@ def main():
         except Exception as e:
             producer.flush()
             print(f"Error occured during consumer polling: {e}")
+            traceback.print_exc()
 
 
 if __name__ == '__main__':
