@@ -26,8 +26,8 @@ def main():
 
     while True:
         message = {
-            "text": "Come si diagnostica?",
-            "conv_id": 1
+            "text": "A che età si possono manifestare i primi sintomi?",
+            "conv_id": 2
         }
         print("Producendo il topic...", flush=True)
         producer.produce(

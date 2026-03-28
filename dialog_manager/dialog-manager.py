@@ -5,7 +5,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import StateGraph, START, END
-from confluent_kafka import Consumer, Producer, KafkaException
+from confluent_kafka import Consumer, Producer, KafkaException, KafkaError
 from neo4j import GraphDatabase
 from openai import OpenAI
 import os
@@ -15,7 +15,7 @@ import traceback
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
-topic_to_consume = os.getenv('TOPIC_TO_CONSUME', 'user_query')
+topic_to_consume = os.getenv('TOPIC_TO_CONSUME', 'conversation_history')
 topic_to_produce = os.getenv('TOPIC_TO_PRODUCE', 'llm_response')
 
 
@@ -46,28 +46,7 @@ def set_up_kafka_producer():
 db_uri = os.getenv('DB_URL', 'neo4j://db-headless-service:7687')
 db_auth = (os.getenv('DB_AUTH_USER', 'neo4j'),
            os.getenv('DB_AUTH_PASSWORD', 'password'))
-
-
-def get_conversation_history(session_id):
-    cypher_query = """
-    MATCH (c:CONVERSATION {conv_id: $session_id})-[:STARTS_WITH|FOLLOWED_BY*0..]->(u:UTTERANCE)
-    RETURN 
-        CASE 
-            WHEN u:USER THEN 'user'
-            WHEN u:SYSTEM THEN 'ai' 
-            ELSE 'unknown' 
-        END AS role, 
-        u.text AS text
-    """
-
-    with GraphDatabase.driver(db_uri, auth=db_auth) as driver:
-        records, _, _ = driver.execute_query(
-            cypher_query,
-            session_id=session_id,
-            database_="neo4j"
-        )
-        return [(record["role"], record["text"]) for record in records]
-
+neo4j_driver = GraphDatabase.driver(db_uri, auth=db_auth)
 
 # LLM variables
 model_name = os.getenv('MODEL_NAME', "Qwen/Qwen3-4B-Instruct-2507")
@@ -90,24 +69,6 @@ def get_embedding(text):
         model=embedding_name).data[0].embedding
 
 
-def get_full_context(conversation_id, user_query):
-    system_prompt = (
-        "system",
-        "Sei un assistente olografico personale specializzato. "
-        "Rispondi alle domande al meglio delle tue capacità. "
-        "Se l'utente fa domande specifiche sull'epilessia, DEVI assolutamente utilizzare il tool 'retrieval_augmented_generation' per cercare le informazioni prima di rispondere. "
-        "Se chiede informazioni sulle date, usa il tool 'holiday_calendar'.")
-    past_conversation_history = get_conversation_history(
-        conversation_id)
-    
-    if len(past_conversation_history) > 4:
-        past_conversation_history = past_conversation_history[-4:]
-
-    current_conversation_history = [("user", user_query)]
-    return [system_prompt] + \
-        past_conversation_history + current_conversation_history
-
-
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
@@ -115,12 +76,20 @@ class AgentState(TypedDict):
 @tool
 def retrieval_augmented_generation(user_query: str) -> list[str]:
     """
-    DEVE essere invocato per TUTTE le domande relative all'epilessia.
-    Cerca nel database vettoriale informazioni cliniche e mediche sull'epilessia.
-    
+    Usa questo tool SOLO SE l'utente fa esplicitamente riferimento alla patologia dell'epilessia
+    o il contesto della conversazione si riferisce CHIARAMENTE a questa pataologia. In questi casi
+    cerca nel database vettoriale informazioni cliniche e mediche sull'epilessia.
+
+
+    NON usare questo tool se l'utente fa domande molto vaghe, come "A che età compaiono i primi sintomi?" 
+    o "Come la si diagnostica?" e non hai modo di capire che l'utente fa effettivamente riferimento all'epilessia. In questi casi
+    chiedi chiarimenti all'utente.
+
     Args:
         user_query: La domanda esatta o il concetto sull'epilessia cercato dall'utente.
     """
+
+    print("Calling RAG tool...", flush=True)
 
     user_query_embedding = get_embedding(user_query)
 
@@ -129,27 +98,28 @@ def retrieval_augmented_generation(user_query: str) -> list[str]:
         YIELD node, score
         WITH node AS emb, score AS affinity ORDER BY affinity DESC
         MATCH (c:CHUNK)-[:HAS_QUESTION|HAS_STATEMENT]-(k:QUESTION|STATEMENT)-[:HAS_EMBEDDING]-(emb:EMBEDDING)
-        RETURN c.text AS text
+        RETURN DISTINCT c.text AS text
     """
 
-    with GraphDatabase.driver(db_uri, auth=db_auth) as driver:
-        records, _, _ = driver.execute_query(
-            cypher_query,
-            embedding=user_query_embedding,
-            database_="neo4j"
-        )
-        return [(record["text"]) for record in records]
+    records, _, _ = neo4j_driver.execute_query(
+        cypher_query,
+        embedding=user_query_embedding,
+        database_="neo4j"
+    )
+    return [(record["text"]) for record in records]
 
 
 @tool
 def holiday_calendar(date: str) -> str:
     """
-    DEVE essere invocato ogni qualvolta l'utente fa riferimento ad una data e vuole conoscere la festività che cade in quella data.
+    Questo tool DEVE essere invocato ogni qualvolta l'utente fa riferimento ad una data e vuole conoscere la festività che cade in quella data.
     Restituisce la festività che cade in quella data specificata dall'utente.
 
     Args:
         date: la data a cui l'utente fa riferimento.
     """
+
+    print("Calling holiday_calendar tool...", flush=True)
 
     return "Natale"
 
@@ -202,22 +172,38 @@ def main():
         try:
             message = consumer.poll(timeout=1.0)
 
-            if message and message.error():
-                print(f"Consumer error: {message}", flush=True)
-            elif message:
+            if message is None:
+                continue
+
+            if message.error():
+                if message.error().code() == KafkaError._PARTITION_EOF:
+                    print(
+                        f"Reached end of partition {message.topic()} [{message.partition()}]", flush=True)
+                else:
+                    print(f"Consumer error: {message.error()}", flush=True)
+            else:
                 payload = json.loads(message.value().decode('utf-8'))
-                user_query = payload['text']
-                conversation_id = payload['conv_id']
 
                 if 'text' not in payload and 'conv_id' not in payload:
                     print(f"[ERROR] Malformed message {payload}", flush=True)
                     continue
 
+                conversation_id = payload['conv_id']
+                conversation_history = [(
+                    "system",
+                    "Sei un assistente olografico personale specializzato. "
+                    "Rispondi alle domande al meglio delle tue capacità. "
+                    "- Se l'utente fa esplicitamente domande specifiche sull'epilessia o riesci a capire dal contesto che sta facendo riferimento"
+                    "all'epilessia DEVI assolutamente utilizzare il tool 'retrieval_augmented_generation' per cercare le informazioni prima di rispondere. "
+                    "Altrimenti, chiedi all'utente di essere meno ambiguo."
+                    "- Se l'utente chiede informazioni sulle date, usa il tool 'holiday_calendar'.")]
+                conversation_history = conversation_history + \
+                    [(message['role'], message['text'])
+                     for message in payload['history']]
+
                 print(f"Received message: {payload}", flush=True)
 
-                full_context = get_full_context(conversation_id, user_query)
-
-                final_state = app.invoke({"messages": full_context})
+                final_state = app.invoke({"messages": conversation_history})
                 llm_response = final_state['messages'][-1].content
 
                 print(llm_response, flush=True)
@@ -231,6 +217,8 @@ def main():
                     topic=topic_to_produce,
                     value=llm_json_response
                 )
+
+                producer.poll(0)
 
                 consumer.commit(message)
         except Exception as e:

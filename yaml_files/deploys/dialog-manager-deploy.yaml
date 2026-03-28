@@ -49,7 +49,7 @@ spec:
           valueFrom:
             configMapKeyRef:
               name: kafka-topics-configmap
-              key: USER_QUERY
+              key: CONVERSATION_HISTORY
         - name: TOPIC_TO_PRODUCE
           valueFrom:
             configMapKeyRef:

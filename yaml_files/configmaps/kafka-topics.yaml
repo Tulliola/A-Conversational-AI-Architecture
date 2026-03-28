@@ -5,3 +5,4 @@ metadata:
 data:
   USER_QUERY: user_query
   LLM_RESPONSE: llm_response
+  CONVERSATION_HISTORY: conversation_history
