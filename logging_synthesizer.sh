@@ -7,4 +7,4 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-cat ./logging/*/*.log | sort | grep ".*[CONV_ID: $1].*"
+cat ./logging/*/*.log | sort | grep "\[CONV_ID: $1\]"
