@@ -52,6 +52,50 @@
                 "panel": "new",
                 "group": "minikube-testing"
             }
+        },
+        {
+            "label": "[TEST KAFKA-CONNECT] Apri tunnel di port-forwarding per testare l'API di Kafka-Connect",
+            "type": "shell",
+            "command": "kubectl port-forward svc/kafka-connect-service 8083:8083",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        },
+        {
+            "label": "[TEST DB] Apri tunnel di port-forwarding per avere accesso al DB da Neo4j Desktop",
+            "type": "shell",
+            "command": "kubectl port-forward svc/db-service 7474:7474 7687:7687 --address 0.0.0.0",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        },
+        {
+            "label": "[MOUNT] Attiva mount per il data-exchange dell'audio del TTS",
+            "type": "shell",
+            "command": "minikube mount \"./data_exchange:/data/audio_files\"",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
+        },
+        {
+            "label": "[MOUNT] Attiva mount per il logging",
+            "type": "shell",
+            "command": "minikube mount \"./logging:/logging\"",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "minikube-testing"
+            }
         }
     ]
 }
