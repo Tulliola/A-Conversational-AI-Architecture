@@ -3,3 +3,4 @@
 
 yaml_files/secrets/*.yaml
 logging
+data_exchange

@@ -15,6 +15,7 @@ os.makedirs(f"{asr_log_dir}", exist_ok=True)
 formatter = logging.Formatter(
     f'%(asctime)s [{pod_id}] %(levelname)s: %(message)s')
 
+
 def setup_logger(logger_name, logfile_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
@@ -26,13 +27,15 @@ def setup_logger(logger_name, logfile_name):
 
     return logger
 
+
 asr_logger = setup_logger("ASR_Logger", f"{asr_log_dir}/{pod_id}.log")
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
 topic_to_produce = os.getenv('TOPIC_TO_PRODUCE', 'user_query')
 
-asr_logger.info(f"ASR Producer ready to publish on {topic_to_produce} Kafka topic ({kafka_url})!")
+asr_logger.info(
+    f"ASR Producer ready to publish on {topic_to_produce} Kafka topic ({kafka_url})!")
 
 producer = Producer({
     'bootstrap.servers': kafka_url
@@ -41,33 +44,40 @@ producer = Producer({
 
 def delivery_report(err, msg, conv_id):
     if err is not None:
-        asr_logger.error(f"[CONV_ID: {conv_id}] Error occured during publishing: {err}")
+        asr_logger.error(
+            f"[CONV_ID: {conv_id}] Error occured during publishing: {err}")
     else:
-        asr_logger.info(f"[CONV_ID: {conv_id}] Message published on {msg.topic()} Kafka topic!")
+        asr_logger.info(
+            f"[CONV_ID: {conv_id}] Message published on {msg.topic()} Kafka topic!")
+
 
 def main():
 
     while True:
         try:
-            conversation_id = 4
+            conversation_id = 1
             message = {
-                "text": "A che età si possono manifestare i primi sintomi di epilessia? Dammi una risposta molto sintetica.",
+                "text": "Which holiday occurs on 1st January?",
                 "conv_id": conversation_id
             }
-            asr_logger.info(f"[CONV_ID: {conversation_id}] Publishing message on {topic_to_produce} Kafka topic...")
+            asr_logger.info(
+                f"[CONV_ID: {conversation_id}] Publishing message on {topic_to_produce} Kafka topic...")
             producer.produce(
                 topic=topic_to_produce,
                 value=json.dumps(message).encode('utf-8'),
-                callback=lambda err, msg: delivery_report(err, msg, conversation_id)
+                callback=lambda err, msg: delivery_report(
+                    err, msg, conversation_id)
             )
 
             producer.poll(0)
+
+            producer.flush()
 
             time.sleep(60)
         except Exception as e:
             producer.flush()
             asr_logger.error(f"Error occured: {e}")
-            asr_logger.error(traceback.format_exc)
+            asr_logger.error(traceback.format_exc())
 
 
 if __name__ == '__main__':

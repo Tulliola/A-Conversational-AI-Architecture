@@ -74,13 +74,23 @@ spec:
             configMapKeyRef:
               name: logging-endpoints-configmap
               key: TTS
+        - name: MY_POD_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         volumeMounts:
         - name: tts-logging
           mountPath: "/data/logging"
+        - name: audio-publication
+          mountPath: "/audio_files"
       volumes:
       - name: tts-logging
         hostPath: 
           path: "/logging"
+          type: Directory
+      - name: audio-publication
+        hostPath: 
+          path: "/data/audio_files"
           type: Directory
 ---
 apiVersion: v1

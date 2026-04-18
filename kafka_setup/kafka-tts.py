@@ -24,11 +24,13 @@ def set_up_kafka_consumer():
             "auto.offset.reset": "latest"
         })
         consumer.subscribe([topic_to_consume])
-        tts_logger.info(f"Subscribed to {topic_to_consume} Kafka topic as a consumer!")
+        tts_logger.info(
+            f"Subscribed to {topic_to_consume} Kafka topic as a consumer!")
 
         return consumer
     except KafkaException as k:
         print(f"Raised exception during subscription: {k}")
+
 
 # Logging context
 tts_log_dir = os.getenv('TTS_LOGGING_ENDPOINT', '/data/logging/tts')
@@ -70,7 +72,11 @@ def main():
                 llm_response = message['text']
                 conversation_id = message['conv_id']
 
-                tts_logger.info(f"[CONV_ID: {conversation_id}] Starting audio synthesis...")
+                tts_logger.info(
+                    f"[CONV_ID: {conversation_id}] Received message from {topic_to_consume} Kafka topic with content: {llm_response}.")
+
+                tts_logger.info(
+                    f"[CONV_ID: {conversation_id}] Starting audio synthesis...")
                 with tts_client.audio.speech.with_streaming_response.create(
                     model="kokoro",
                     input=llm_response,
@@ -78,7 +84,8 @@ def main():
                 ) as response:
                     response.stream_to_file(os.path.join(
                         shared_dir, "answer_test.mp3"))
-                tts_logger.info(f"[CONV_ID: {conversation_id}] Audio synthesis completed!")
+                tts_logger.info(
+                    f"[CONV_ID: {conversation_id}] Audio synthesis completed!")
         except Exception as e:
             tts_logger.error(f"Error occured: {e}")
             tts_logger.error(traceback.format_exc)

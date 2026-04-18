@@ -48,10 +48,6 @@ spec:
             configMapKeyRef:
               name: asr-configmap
               key: ASR_COMPUTE_TYPE
-        - name: MY_POD_ID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         - name: ASR_LOGGING_ENDPOINT
           valueFrom:
             configMapKeyRef:
@@ -75,6 +71,10 @@ spec:
             configMapKeyRef:
               name: kafka-topics-configmap
               key: USER_QUERY
+        - name: MY_POD_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         volumeMounts:
         - name: asr-logging
           mountPath: "/data/logging"

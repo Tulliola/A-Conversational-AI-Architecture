@@ -31,7 +31,7 @@ formatter = logging.Formatter(
 
 def setup_logger(logger_name, logfile_name):
     logger = logging.getLogger(logger_name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     handler = logging.FileHandler(logfile_name)
     handler.setFormatter(formatter)
@@ -285,7 +285,10 @@ def main():
         except Exception as e:
             producer.flush()
             dm_logger.error(f"Error occured: {e}")
-            dm_logger.error(traceback.format_exc)
+            dm_logger.error(traceback.format_exc())
+
+            if message is not None:
+                 consumer.commit(message)
 
 
 if __name__ == '__main__':
