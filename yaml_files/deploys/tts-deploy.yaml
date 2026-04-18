@@ -69,13 +69,18 @@ spec:
             configMapKeyRef:
               name: kafka-topics-configmap
               key: LLM_RESPONSE
+        - name: TTS_LOGGING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: logging-endpoints-configmap
+              key: TTS
         volumeMounts:
-        - name: shared-storage
-          mountPath: /audio_files
+        - name: tts-logging
+          mountPath: "/data/logging"
       volumes:
-      - name: shared-storage
-        hostPath:
-          path: /data_exchange
+      - name: tts-logging
+        hostPath: 
+          path: "/logging"
           type: Directory
 ---
 apiVersion: v1

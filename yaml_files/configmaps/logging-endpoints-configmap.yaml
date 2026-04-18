@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-endpoints-configmap
+data:
+  LLM: "/data/logging/llm"
+  EMBEDDING: "/data/logging/embedding"
+  DIALOG_MANAGER: "/data/logging/dialog_manager"
+  ASR: "/data/logging/asr"
+  TTS: "/data/logging/tts"

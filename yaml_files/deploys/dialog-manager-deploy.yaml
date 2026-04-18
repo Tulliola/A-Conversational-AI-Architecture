@@ -70,4 +70,32 @@ spec:
             secretKeyRef:
               name: db-secret
               key: AUTH_PASSWORD
+        - name: MY_POD_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: LLM_LOGGING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: logging-endpoints-configmap
+              key: LLM
+        - name: EMB_LOGGING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: logging-endpoints-configmap
+              key: EMBEDDING
+        - name: DM_LOGGING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: logging-endpoints-configmap
+              key: DIALOG_MANAGER
         command: ["python", "-u", "dialog-manager.py"]
+        volumeMounts:
+        - name: dialog-manager-logging
+          mountPath: "/data/logging"
+      volumes:
+      - name: dialog-manager-logging
+        hostPath:
+          path: "/logging"
+          type: Directory
+

@@ -3,7 +3,7 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, SystemMessage
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import ToolNode, InjectedState
 from langgraph.graph import StateGraph, START, END
 from confluent_kafka import Consumer, Producer, KafkaException, KafkaError
 from neo4j import GraphDatabase
@@ -12,6 +12,39 @@ import os
 import json
 import sys
 import traceback
+import logging
+
+# Logging context
+llm_log_dir = os.getenv('LLM_LOGGING_ENDPOINT', '/data/logging/llm')
+emb_log_dir = os.getenv('EMB_LOGGING_ENDPOINT', '/data/logging/embedding')
+dm_log_dir = os.getenv('DM_LOGGING_ENDPOINT', '/data/logging/dialog_manager')
+
+pod_id = os.getenv('MY_POD_ID', 'dialog-manager')
+
+os.makedirs(f"{llm_log_dir}", exist_ok=True)
+os.makedirs(f"{emb_log_dir}", exist_ok=True)
+os.makedirs(f"{dm_log_dir}", exist_ok=True)
+
+formatter = logging.Formatter(
+    f'%(asctime)s [{pod_id}] %(levelname)s: %(message)s')
+
+
+def setup_logger(logger_name, logfile_name):
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.INFO)
+
+    handler = logging.FileHandler(logfile_name)
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+
+    return logger
+
+
+llm_logger = setup_logger(
+    "LLM_Logger", f"{llm_log_dir}/llm_calls-{pod_id}.log")
+emb_logger = setup_logger(
+    "EMB_Logger", f"{emb_log_dir}/emb_calls-{pod_id}.log")
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
@@ -28,11 +61,9 @@ def set_up_kafka_consumer():
             'enable.auto.commit': False
         })
         consumer.subscribe([topic_to_consume])
-        print(f"Subscribed to topic {topic_to_consume}", flush=True)
 
         return consumer
     except KafkaException as k:
-        print(f"Raised exception during subscription: {k}")
         sys.exit(1)
 
 
@@ -40,6 +71,12 @@ def set_up_kafka_producer():
     return Producer({
         'bootstrap.servers': kafka_url
     })
+
+def delivery_report(err, msg, conv_id, logger):
+    if err is not None:
+        logger.error(f"[CONV_ID: {conv_id}] Error occured during publishing: {err}")
+    else:
+        logger.info(f"[CONV_ID: {conv_id}] Message published on {msg.topic()} Kafka topic!")
 
 
 # Neo4j variables
@@ -63,18 +100,22 @@ embedding_model = OpenAI(
 )
 
 
-def get_embedding(text):
-    return embedding_model.embeddings.create(
+def get_embedding(text, conversation_id):
+    emb_logger.info(f"[CONV_ID: {conversation_id}] Embedding model invoked...")
+    embedding = embedding_model.embeddings.create(
         input=[text.replace('\n', ' ')],
         model=embedding_name).data[0].embedding
+    emb_logger.info(f"[CONV_ID: {conversation_id}] Embedding produced!")
+    return embedding
 
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
+    conversation_id: int
 
 
 @tool
-def retrieval_augmented_generation(user_query: str) -> list[str]:
+def retrieval_augmented_generation(user_query: str, state: Annotated[dict, InjectedState]) -> list[str]:
     """
     Usa questo tool SOLO SE l'utente fa esplicitamente riferimento alla patologia dell'epilessia
     o il contesto della conversazione si riferisce CHIARAMENTE a questa pataologia. In questi casi
@@ -89,9 +130,10 @@ def retrieval_augmented_generation(user_query: str) -> list[str]:
         user_query: La domanda esatta o il concetto sull'epilessia cercato dall'utente.
     """
 
-    print("Calling RAG tool...", flush=True)
+    llm_logger.debug(
+        f"[CONV_ID: {state['conversation_id']}] LLM model has requested RAG tool.")
 
-    user_query_embedding = get_embedding(user_query)
+    user_query_embedding = get_embedding(user_query, state['conversation_id'])
 
     cypher_query = """
         CALL db.index.vector.queryNodes("embeddingIndex", 3, $embedding)
@@ -110,7 +152,7 @@ def retrieval_augmented_generation(user_query: str) -> list[str]:
 
 
 @tool
-def holiday_calendar(date: str) -> str:
+def holiday_calendar(date: str, state: Annotated[dict, InjectedState]) -> str:
     """
     Questo tool DEVE essere invocato ogni qualvolta l'utente fa riferimento ad una data e vuole conoscere la festività che cade in quella data.
     Restituisce la festività che cade in quella data specificata dall'utente.
@@ -119,14 +161,20 @@ def holiday_calendar(date: str) -> str:
         date: la data a cui l'utente fa riferimento.
     """
 
-    print("Calling holiday_calendar tool...", flush=True)
+    llm_logger.debug(
+        f"[CONV_ID: {state['conversation_id']}] LLM model has requested holiday_calendar tool.")
 
     return "Natale"
 
 
 def model_call(state: AgentState) -> AgentState:
+    llm_logger.info(
+        f"[CONV_ID: {state['conversation_id']}] LLM model invoked...")
     response = model.invoke(state['messages'])
-    return {'messages': [response]}
+    llm_logger.info(
+        f"[CONV_ID: {state['conversation_id']}] LLM model response generation ended!")
+
+    return {'messages': [response], 'conversation_id': state['conversation_id']}
 
 
 def should_continue(state: AgentState):
@@ -134,9 +182,6 @@ def should_continue(state: AgentState):
 
     return hasattr(last_message, 'tool_calls') and len(last_message.tool_calls) > 0
 
-
-consumer = set_up_kafka_consumer()
-producer = set_up_kafka_producer()
 
 tools = [holiday_calendar, retrieval_augmented_generation]
 stop_tokens = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"]
@@ -168,6 +213,15 @@ app = graph.compile()
 
 
 def main():
+    dm_logger = setup_logger("DIALOG_MANAGER_Logger",
+                             f"{dm_log_dir}/{pod_id}.log")
+
+    dm_logger.info("Starting Dialog Managing...")
+
+    consumer = set_up_kafka_consumer()
+    dm_logger.info(f"Subscribed to {topic_to_consume} Kafka topic as a consumer!")
+
+    producer = set_up_kafka_producer()
     while True:
         try:
             message = consumer.poll(timeout=1.0)
@@ -177,15 +231,15 @@ def main():
 
             if message.error():
                 if message.error().code() == KafkaError._PARTITION_EOF:
-                    print(
-                        f"Reached end of partition {message.topic()} [{message.partition()}]", flush=True)
+                    dm_logger.error(
+                        f"Reached end of partition {message.topic()} [{message.partition()}].")
                 else:
-                    print(f"Consumer error: {message.error()}", flush=True)
+                    dm_logger.error(f"Consumer error: {message.error()}.")
             else:
                 payload = json.loads(message.value().decode('utf-8'))
 
                 if 'text' not in payload and 'conv_id' not in payload:
-                    print(f"[ERROR] Malformed message {payload}", flush=True)
+                    dm_logger.error(f"Received malformed message {payload}.")
                     continue
 
                 conversation_id = payload['conv_id']
@@ -201,21 +255,28 @@ def main():
                     [(message['role'], message['text'])
                      for message in payload['history']]
 
-                print(f"Received message: {payload}", flush=True)
+                dm_logger.info(
+                    f"[CONV_ID: {conversation_id}] Received message from {topic_to_consume} Kafka topic with content: {payload}.")
+                dm_logger.info(
+                    f"[CONV_ID: {conversation_id}] Starting Dialog Manager graph app invocation...")
+                final_state = app.invoke(
+                    {"messages": conversation_history, "conversation_id": conversation_id})
+                dm_logger.info(
+                    f"[CONV_ID: {conversation_id}] Dialog Manager graph app invocation ended.")
 
-                final_state = app.invoke({"messages": conversation_history})
                 llm_response = final_state['messages'][-1].content
-
-                print(llm_response, flush=True)
 
                 llm_json_response = json.dumps({
                     "text": llm_response,
                     "conv_id": conversation_id
                 }).encode('utf-8')
 
+                dm_logger.info(
+                    f"[CONV_ID: {conversation_id}] Publishing message on {topic_to_produce} Kafka topic...")
                 producer.produce(
                     topic=topic_to_produce,
-                    value=llm_json_response
+                    value=llm_json_response,
+                    callback=lambda err, msg: delivery_report(err, msg, conversation_id, dm_logger)
                 )
 
                 producer.poll(0)
@@ -223,8 +284,8 @@ def main():
                 consumer.commit(message)
         except Exception as e:
             producer.flush()
-            print(f"Error occured during consumer polling: {e}")
-            traceback.print_exc()
+            dm_logger.error(f"Error occured: {e}")
+            dm_logger.error(traceback.format_exc)
 
 
 if __name__ == '__main__':

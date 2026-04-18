@@ -48,6 +48,15 @@ spec:
             configMapKeyRef:
               name: asr-configmap
               key: ASR_COMPUTE_TYPE
+        - name: MY_POD_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ASR_LOGGING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: logging-endpoints-configmap
+              key: ASR
         volumeMounts:
         - name: asr-model-storage
           mountPath: /root/.cache/huggingface
@@ -66,10 +75,18 @@ spec:
             configMapKeyRef:
               name: kafka-topics-configmap
               key: USER_QUERY
+        volumeMounts:
+        - name: asr-logging
+          mountPath: "/data/logging"
       volumes:
       - name: asr-model-storage
         persistentVolumeClaim:
           claimName: hdd-pvc
+      - name: asr-logging
+        hostPath:
+          path: "/logging"
+          type: Directory
+
 ---
 apiVersion: v1
 kind: Service

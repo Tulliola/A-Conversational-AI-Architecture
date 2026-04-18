@@ -2,3 +2,4 @@
 .venv
 
 yaml_files/secrets/*.yaml
+logging
