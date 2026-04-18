@@ -281,6 +281,8 @@ def main():
 
                 producer.poll(0)
 
+                producer.flush()
+
                 consumer.commit(message)
         except Exception as e:
             producer.flush()
