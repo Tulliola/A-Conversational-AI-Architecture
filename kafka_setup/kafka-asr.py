@@ -4,23 +4,24 @@ import json
 import time
 import traceback
 import logging
+import sys
 
 # Logging context
 asr_log_dir = os.getenv('ASR_LOGGING_ENDPOINT', '/data/logging/asr')
 
 pod_id = os.getenv('MY_POD_ID', 'asr')
 
-os.makedirs(f"{asr_log_dir}", exist_ok=True)
+# os.makedirs(f"{asr_log_dir}", exist_ok=True)
 
 formatter = logging.Formatter(
-    f'%(asctime)s [{pod_id}] %(levelname)s: %(message)s')
+    f'%(asctime)s [%(name)s] [{pod_id}] %(levelname)s: %(message)s')
 
 
-def setup_logger(logger_name, logfile_name):
+def setup_logger(logger_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
 
-    handler = logging.FileHandler(logfile_name)
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)
@@ -28,7 +29,7 @@ def setup_logger(logger_name, logfile_name):
     return logger
 
 
-asr_logger = setup_logger("ASR_Logger", f"{asr_log_dir}/{pod_id}.log")
+asr_logger = setup_logger("ASR_Logger")
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')

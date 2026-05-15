@@ -21,19 +21,19 @@ dm_log_dir = os.getenv('DM_LOGGING_ENDPOINT', '/data/logging/dialog_manager')
 
 pod_id = os.getenv('MY_POD_ID', 'dialog-manager')
 
-os.makedirs(f"{llm_log_dir}", exist_ok=True)
-os.makedirs(f"{emb_log_dir}", exist_ok=True)
-os.makedirs(f"{dm_log_dir}", exist_ok=True)
+# os.makedirs(f"{llm_log_dir}", exist_ok=True)
+# os.makedirs(f"{emb_log_dir}", exist_ok=True)
+# os.makedirs(f"{dm_log_dir}", exist_ok=True)
 
 formatter = logging.Formatter(
-    f'%(asctime)s [{pod_id}] %(levelname)s: %(message)s')
+    f'%(asctime)s [%(name)s] [{pod_id}] %(levelname)s: %(message)s')
 
 
-def setup_logger(logger_name, logfile_name):
+def setup_logger(logger_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
 
-    handler = logging.FileHandler(logfile_name)
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)
@@ -41,10 +41,8 @@ def setup_logger(logger_name, logfile_name):
     return logger
 
 
-llm_logger = setup_logger(
-    "LLM_Logger", f"{llm_log_dir}/llm_calls-{pod_id}.log")
-emb_logger = setup_logger(
-    "EMB_Logger", f"{emb_log_dir}/emb_calls-{pod_id}.log")
+llm_logger = setup_logger("LLM_Logger")
+emb_logger = setup_logger("EMB_Logger")
 
 # Kafka context
 kafka_url = os.getenv('KAFKA_URL', 'localhost:9092')
@@ -72,11 +70,14 @@ def set_up_kafka_producer():
         'bootstrap.servers': kafka_url
     })
 
+
 def delivery_report(err, msg, conv_id, logger):
     if err is not None:
-        logger.error(f"[CONV_ID: {conv_id}] Error occured during publishing: {err}")
+        logger.error(
+            f"[CONV_ID: {conv_id}] Error occured during publishing: {err}")
     else:
-        logger.info(f"[CONV_ID: {conv_id}] Message published on {msg.topic()} Kafka topic!")
+        logger.info(
+            f"[CONV_ID: {conv_id}] Message published on {msg.topic()} Kafka topic!")
 
 
 # Neo4j variables
@@ -213,13 +214,13 @@ app = graph.compile()
 
 
 def main():
-    dm_logger = setup_logger("DIALOG_MANAGER_Logger",
-                             f"{dm_log_dir}/{pod_id}.log")
+    dm_logger = setup_logger("DIALOG-MANAGER_Logger")
 
     dm_logger.info("Starting Dialog Managing...")
 
     consumer = set_up_kafka_consumer()
-    dm_logger.info(f"Subscribed to {topic_to_consume} Kafka topic as a consumer!")
+    dm_logger.info(
+        f"Subscribed to {topic_to_consume} Kafka topic as a consumer!")
 
     producer = set_up_kafka_producer()
     while True:
@@ -276,7 +277,8 @@ def main():
                 producer.produce(
                     topic=topic_to_produce,
                     value=llm_json_response,
-                    callback=lambda err, msg: delivery_report(err, msg, conversation_id, dm_logger)
+                    callback=lambda err, msg: delivery_report(
+                        err, msg, conversation_id, dm_logger)
                 )
 
                 producer.poll(0)
@@ -290,7 +292,7 @@ def main():
             dm_logger.error(traceback.format_exc())
 
             if message is not None:
-                 consumer.commit(message)
+                consumer.commit(message)
 
 
 if __name__ == '__main__':

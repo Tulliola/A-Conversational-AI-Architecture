@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import traceback
+import sys
 
 tts_url = os.getenv('TTS_URL', "http://localhost:8880/v1")
 shared_dir = os.getenv('SHARED_DIR', '/audio_files')
@@ -33,21 +34,21 @@ def set_up_kafka_consumer():
 
 
 # Logging context
-tts_log_dir = os.getenv('TTS_LOGGING_ENDPOINT', '/data/logging/tts')
+# tts_log_dir = os.getenv('TTS_LOGGING_ENDPOINT', '/data/logging/tts')
 
 pod_id = os.getenv('MY_POD_ID', 'tts')
 
-os.makedirs(f"{tts_log_dir}", exist_ok=True)
+# os.makedirs(f"{tts_log_dir}", exist_ok=True)
 
 formatter = logging.Formatter(
-    f'%(asctime)s [{pod_id}] %(levelname)s: %(message)s')
+    f'%(asctime)s [%(name)s] [{pod_id}] %(levelname)s: %(message)s')
 
 
-def setup_logger(logger_name, logfile_name):
+def setup_logger(logger_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
 
-    handler = logging.FileHandler(logfile_name)
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)
@@ -55,7 +56,7 @@ def setup_logger(logger_name, logfile_name):
     return logger
 
 
-tts_logger = setup_logger("TTS_Logger", f"{tts_log_dir}/{pod_id}.log")
+tts_logger = setup_logger("TTS_Logger")
 
 
 def main():
